@@ -1,0 +1,25 @@
+{
+  "name": "konsinyasi-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "konsinyasi-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "konsinyasi-media"
+    }
+  ],
+  "vars": {
+    "BETTER_AUTH_SECRET": "REPLACE_WITH_SECRET_KEY",
+    "BETTER_AUTH_URL": "http://localhost:8787",
+    "FRONTEND_URL": "http://localhost:5173"
+  }
+}

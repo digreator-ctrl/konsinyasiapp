@@ -1,0 +1,74 @@
+// Return Agent Pages
+import React from "react";
+import { useTable, useForm } from "@refinedev/antd";
+import { useShow } from "@refinedev/core";
+import { List, Create, Show, ShowButton } from "@refinedev/antd";
+import { Table, Form, Input, Select, InputNumber, Space, Tag, Descriptions, Button } from "antd";
+import { Plus, Trash2 } from "lucide-react";
+
+export const ReturnAgentList: React.FC = () => {
+  const { tableProps } = useTable({ resource: "returns", meta: { query: { source: "agent" } }, syncWithLocation: true });
+  return (
+    <List title="Retur Agen">
+      <Table {...tableProps} rowKey="id" size="middle">
+        <Table.Column dataIndex="source_id" title="Agen" />
+        <Table.Column dataIndex="return_date" title="Tanggal" />
+        <Table.Column dataIndex="status" title="Status" render={(s) => {
+          const colors: Record<string, string> = { submitted: "orange", verified: "blue", processed: "green", rejected: "red" };
+          return <Tag color={colors[s]}>{s === "submitted" ? "Diajukan" : s === "verified" ? "Diverifikasi" : s === "processed" ? "Diganti" : "Ditolak"}</Tag>;
+        }} />
+        <Table.Column title="Aksi" render={(_, record: any) => <ShowButton hideText size="small" recordItemId={record.id} />} />
+      </Table>
+    </List>
+  );
+};
+
+export const ReturnAgentCreate: React.FC = () => {
+  const { formProps, saveButtonProps } = useForm({ resource: "returns" });
+  return (
+    <Create saveButtonProps={saveButtonProps} title="Buat Retur Agen">
+      <Form {...formProps} layout="vertical" initialValues={{ source: "agent", items: [{}] }}>
+        <Form.Item name="source" hidden><Input /></Form.Item>
+        <Form.Item label="ID Agen" name="source_id" rules={[{ required: true }]}><Input placeholder="ID Agen" /></Form.Item>
+        <Form.Item label="Tanggal Retur" name="return_date" rules={[{ required: true }]}><Input type="date" /></Form.Item>
+        <Form.List name="items">
+          {(fields, { add, remove }) => (<>
+            {fields.map((field) => (
+              <Space key={field.key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
+                <Form.Item {...field} name={[field.name, "product_id"]} label="Produk" rules={[{ required: true }]}><Input placeholder="ID Produk" style={{ width: 180 }} /></Form.Item>
+                <Form.Item {...field} name={[field.name, "quantity"]} label="Qty" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 80 }} /></Form.Item>
+                <Form.Item {...field} name={[field.name, "reason"]} label="Alasan" rules={[{ required: true }]}>
+                  <Select style={{ width: 200 }} options={[{ label: "Cacat Produksi", value: "defect_production" }, { label: "Cacat Pengiriman", value: "defect_shipping" }]} />
+                </Form.Item>
+                {fields.length > 1 && <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => remove(field.name)} />}
+              </Space>
+            ))}
+            <Button type="dashed" onClick={() => add()} block icon={<Plus size={14} />}>Tambah Item</Button>
+          </>)}
+        </Form.List>
+        <Form.Item label="Catatan" name="notes" style={{ marginTop: 16 }}><Input.TextArea rows={2} /></Form.Item>
+      </Form>
+    </Create>
+  );
+};
+
+export const ReturnAgentShow: React.FC = () => {
+  const { queryResult } = useShow({ resource: "returns" });
+  const record = queryResult?.data?.data;
+  return (
+    <Show title="Detail Retur Agen">
+      <Descriptions bordered column={1} size="small">
+        <Descriptions.Item label="Agen">{record?.source_id}</Descriptions.Item>
+        <Descriptions.Item label="Tanggal">{record?.return_date}</Descriptions.Item>
+        <Descriptions.Item label="Status"><Tag>{record?.status}</Tag></Descriptions.Item>
+      </Descriptions>
+      {record?.items && (
+        <Table dataSource={record.items} rowKey="id" size="small" style={{ marginTop: 16 }} pagination={false}>
+          <Table.Column dataIndex="product_name" title="Produk" />
+          <Table.Column dataIndex="quantity" title="Qty" />
+          <Table.Column dataIndex="reason" title="Alasan" render={(r) => r === "defect_production" ? "Cacat Produksi" : "Cacat Pengiriman"} />
+        </Table>
+      )}
+    </Show>
+  );
+};
