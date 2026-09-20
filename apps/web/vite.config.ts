@@ -56,6 +56,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ["@tanstack/react-query"],
   },
   server: {
     port: 5173,

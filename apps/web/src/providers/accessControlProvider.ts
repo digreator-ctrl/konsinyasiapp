@@ -40,7 +40,6 @@ export const accessControlProvider: AccessControlProvider = {
       dashboard: "dashboard",
       producers: "producers",
       products: "products",
-      "sales-team": "sales_team",
       stores: "stores",
       "stock-entries": "stock_entries",
       warehouse: "warehouse",

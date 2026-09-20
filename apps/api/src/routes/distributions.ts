@@ -19,8 +19,17 @@ distributions.get("/", async (c) => {
   const channel = url.searchParams.get("channel") || "sales";
   const resource = channel === "agent" ? "distribution_agent" : "distribution_sales";
 
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  
+  const additionalFilters = [eq(schema.distributions.channel, channel)];
+  if (isSales && channel === "sales") {
+    additionalFilters.push(eq(schema.distributions.recipient_id, userId));
+  }
+
   return paginatedList(c, schema.distributions, schema.distributions.tenant_id, {
-    additionalFilters: [eq(schema.distributions.channel, channel)],
+    additionalFilters,
   });
 });
 
@@ -30,10 +39,19 @@ distributions.get("/:id", async (c) => {
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
 
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+
+  const conditions = [eq(schema.distributions.id, id), eq(schema.distributions.tenant_id, tenantId)];
+  if (isSales) {
+    conditions.push(eq(schema.distributions.recipient_id, userId));
+  }
+
   const dist = await db
     .select()
     .from(schema.distributions)
-    .where(and(eq(schema.distributions.id, id), eq(schema.distributions.tenant_id, tenantId)))
+    .where(and(...conditions))
     .limit(1);
 
   if (dist.length === 0) return c.json({ success: false, error: "Distribusi tidak ditemukan" }, 404);

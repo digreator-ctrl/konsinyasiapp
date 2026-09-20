@@ -14,7 +14,15 @@ const consignments = new Hono<AppEnv>();
 consignments.use("*", authMiddleware);
 
 consignments.get("/", requirePermission("consignments", "list"), async (c) => {
-  return paginatedList(c, schema.consignments, schema.consignments.tenant_id);
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  
+  const additionalFilters = isSales ? [eq(schema.consignments.sales_id, userId)] : [];
+  
+  return paginatedList(c, schema.consignments, schema.consignments.tenant_id, {
+    additionalFilters
+  });
 });
 
 consignments.get("/:id", requirePermission("consignments", "show"), async (c) => {
@@ -22,10 +30,19 @@ consignments.get("/:id", requirePermission("consignments", "show"), async (c) =>
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
 
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+
+  const conditions = [eq(schema.consignments.id, id), eq(schema.consignments.tenant_id, tenantId)];
+  if (isSales) {
+    conditions.push(eq(schema.consignments.sales_id, userId));
+  }
+
   const consignment = await db
     .select()
     .from(schema.consignments)
-    .where(and(eq(schema.consignments.id, id), eq(schema.consignments.tenant_id, tenantId)))
+    .where(and(...conditions))
     .limit(1);
 
   if (consignment.length === 0) return c.json({ success: false, error: "Konsinyasi tidak ditemukan" }, 404);

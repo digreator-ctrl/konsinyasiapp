@@ -14,7 +14,15 @@ const returns = new Hono<AppEnv>();
 returns.use("*", authMiddleware);
 
 returns.get("/", async (c) => {
-  return paginatedList(c, schema.returns, schema.returns.tenant_id);
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  
+  const additionalFilters = isSales ? [eq(schema.returns.source_id, userId)] : [];
+
+  return paginatedList(c, schema.returns, schema.returns.tenant_id, {
+    additionalFilters
+  });
 });
 
 returns.get("/:id", async (c) => {
@@ -22,10 +30,19 @@ returns.get("/:id", async (c) => {
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
 
+  const roles = c.get("userRoles");
+  const userId = c.get("userId");
+  const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+
+  const conditions = [eq(schema.returns.id, id), eq(schema.returns.tenant_id, tenantId)];
+  if (isSales) {
+    conditions.push(eq(schema.returns.source_id, userId));
+  }
+
   const ret = await db
     .select()
     .from(schema.returns)
-    .where(and(eq(schema.returns.id, id), eq(schema.returns.tenant_id, tenantId)))
+    .where(and(...conditions))
     .limit(1);
 
   if (ret.length === 0) return c.json({ success: false, error: "Retur tidak ditemukan" }, 404);

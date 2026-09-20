@@ -53,7 +53,6 @@ import { RegisterPage } from "./pages/auth/register";
 import { DashboardPage } from "./pages/dashboard";
 import { ProducerList, ProducerCreate, ProducerEdit, ProducerShow } from "./pages/producers";
 import { ProductList, ProductCreate, ProductEdit, ProductShow } from "./pages/products";
-import { SalesTeamList, SalesTeamCreate, SalesTeamEdit, SalesTeamShow } from "./pages/sales-team";
 import { StoreList, StoreCreate, StoreEdit, StoreShow } from "./pages/stores";
 import { StockEntryList, StockEntryCreate, StockEntryShow } from "./pages/stock-entries";
 import { WarehousePage } from "./pages/warehouse";
@@ -272,18 +271,6 @@ function App() {
                   label: "Data Barang",
                   parent: "master-data",
                   icon: <Package size={18} />,
-                },
-              },
-              {
-                name: "sales-team",
-                list: "/sales-team",
-                create: "/sales-team/create",
-                edit: "/sales-team/edit/:id",
-                show: "/sales-team/show/:id",
-                meta: {
-                  label: "Tim Sales",
-                  parent: "master-data",
-                  icon: <Users size={18} />,
                 },
               },
               {
@@ -512,13 +499,6 @@ function App() {
                   <Route path="create" element={<ProductCreate />} />
                   <Route path="edit/:id" element={<ProductEdit />} />
                   <Route path="show/:id" element={<ProductShow />} />
-                </Route>
-
-                <Route path="/sales-team">
-                  <Route index element={<SalesTeamList />} />
-                  <Route path="create" element={<SalesTeamCreate />} />
-                  <Route path="edit/:id" element={<SalesTeamEdit />} />
-                  <Route path="show/:id" element={<SalesTeamShow />} />
                 </Route>
 
                 <Route path="/stores">
