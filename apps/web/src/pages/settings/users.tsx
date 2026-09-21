@@ -1,11 +1,15 @@
 // User Management Pages
 import React, { useEffect, useState } from "react";
 import { useTable, useForm, useSelect } from "@refinedev/antd";
-import { useParsed } from "@refinedev/core";
-import { List, Create, Edit, EditButton, DeleteButton, SaveButton } from "@refinedev/antd";
-import { Table, Form, Input, Select, Space, Tag, Row, Col, Steps, Button, Grid } from "antd";
+import { useParsed, useShow } from "@refinedev/core";
+import { List, Create, Edit, Show, EditButton, DeleteButton, SaveButton } from "@refinedev/antd";
+import { Table, Form, Input, Select, Space, Tag, Row, Col, Steps, Button, Grid, Badge, Card, Avatar, Typography, Divider } from "antd";
+import { useNavigate } from "react-router";
+import { Mail, Phone, MapPin, Calendar, Briefcase, User } from "lucide-react";
 
-const AddressFormItems: React.FC<{ initialData?: any }> = ({ initialData }) => {
+const { Text, Title } = Typography;
+
+export const AddressFormItems: React.FC<{ initialData?: any }> = ({ initialData }) => {
   const [provinces, setProvinces] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
@@ -153,9 +157,22 @@ const AddressFormItems: React.FC<{ initialData?: any }> = ({ initialData }) => {
 
 export const UserList: React.FC = () => {
   const { tableProps } = useTable({ resource: "users", syncWithLocation: true });
+  const navigate = useNavigate();
   return (
     <List title="Manajemen Pengguna" resource="settings-users">
-      <Table {...tableProps} rowKey="id" size="middle">
+      <style>{`
+        .clickable-row { cursor: pointer; transition: background-color 0.2s ease; }
+        .clickable-row:hover > td { background-color: rgba(79, 70, 229, 0.08) !important; }
+      `}</style>
+      <Table
+        {...tableProps}
+        rowKey="id"
+        size="middle"
+        rowClassName={() => "clickable-row"}
+        onRow={(record: any) => ({
+          onClick: () => navigate(`/settings/users/show/${record.id}`),
+        })}
+      >
         <Table.Column dataIndex="name" title="Nama" sorter />
         <Table.Column dataIndex="email" title="Email" />
         <Table.Column 
@@ -168,14 +185,131 @@ export const UserList: React.FC = () => {
             </>
           )} 
         />
-        <Table.Column title="Aksi" render={(_, record: any) => (
-          <Space>
-            <EditButton hideText size="small" recordItemId={record.id} resource="settings-users" />
-            <DeleteButton hideText size="small" recordItemId={record.id} resource="settings-users" />
-          </Space>
-        )} />
+        <Table.Column
+          dataIndex="status"
+          title="Status"
+          render={(status: string) => (
+            <Badge
+              status={status === "active" ? "success" : status === "suspended" ? "warning" : "default"}
+              text={status === "active" ? "Aktif" : status === "suspended" ? "Ditangguhkan" : "Nonaktif"}
+            />
+          )}
+        />
       </Table>
     </List>
+  );
+};
+
+export const UserShow: React.FC = () => {
+  const { id } = useParsed();
+  const { queryResult } = useShow({ resource: "users", id });
+  const record = queryResult?.data?.data;
+
+  const statusMap: Record<string, { status: "success" | "warning" | "default"; text: string }> = {
+    active: { status: "success", text: "Aktif" },
+    suspended: { status: "warning", text: "Ditangguhkan" },
+    inactive: { status: "default", text: "Nonaktif" },
+  };
+  const st = statusMap[record?.status] || statusMap.inactive;
+
+  return (
+    <Show
+      title="Detail Pengguna"
+      resource="settings-users"
+      headerButtons={({ defaultButtons }) => (
+        <Space>
+          <EditButton type="primary" style={{ boxShadow: 'none' }} resource="settings-users" />
+          <DeleteButton type="primary" style={{ boxShadow: 'none' }} resource="settings-users" />
+        </Space>
+      )}
+    >
+      <Card bordered={false} style={{ boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" }}>
+        {/* Header Profil (Nama, Status, Role) */}
+        <div style={{ marginBottom: 24 }}>
+          <Title level={3} style={{ marginBottom: 8, marginTop: 0 }}>{record?.name || "-"}</Title>
+          <Space size={16} align="center">
+            <Badge status={st.status} text={<Text strong>{st.text}</Text>} />
+            <div>
+              {record?.roles?.length > 0
+                ? record?.roles?.map((r: any) => <Tag key={r.id} color="blue" style={{ margin: 0 }}>{r.name}</Tag>)
+                : <Text type="secondary">-</Text>}
+            </div>
+          </Space>
+        </div>
+
+        <Divider style={{ margin: '16px 0 24px 0' }} />
+
+        {/* Detail Informasi */}
+        <Title level={5} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Briefcase size={18} /> Informasi Kontak
+        </Title>
+        <Row gutter={[16, 24]}>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Email</Text>
+            <Space>
+              <Mail size={16} style={{ color: '#9CA3AF' }} />
+              <Text strong>{record?.email || "-"}</Text>
+            </Space>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Telepon</Text>
+            <Space>
+              <Phone size={16} style={{ color: '#9CA3AF' }} />
+              <Text strong>{record?.phone || "-"}</Text>
+            </Space>
+          </Col>
+        </Row>
+
+        <Divider style={{ margin: '24px 0' }} />
+
+        <Title level={5} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <MapPin size={18} /> Domisili & Alamat
+        </Title>
+        <Row gutter={[16, 24]}>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Provinsi</Text>
+            <Text strong>{record?.province || "-"}</Text>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Kota / Kabupaten</Text>
+            <Text strong>{record?.city || "-"}</Text>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Kecamatan</Text>
+            <Text strong>{record?.district || "-"}</Text>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Desa / Kelurahan</Text>
+            <Text strong>{record?.village || "-"}</Text>
+          </Col>
+          <Col xs={24}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Alamat Lengkap</Text>
+            <Text strong>{record?.address || "-"}</Text>
+          </Col>
+          {record?.gmaps_url && (
+            <Col xs={24}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Google Maps</Text>
+              <a href={record.gmaps_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <MapPin size={14} /> Buka di Maps
+              </a>
+            </Col>
+          )}
+        </Row>
+
+        <Divider style={{ margin: '24px 0' }} />
+        
+        <Row>
+          <Col xs={24}>
+            <Space style={{ color: '#9CA3AF' }}>
+              <Calendar size={14} />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Bergabung pada: {record?.created_at ? new Date(record.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-"}
+              </Text>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+    </Show>
   );
 };
 

@@ -9,7 +9,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../index";
-import { RESOURCES, ACTIONS, DefaultRole } from "@konsinyasi/shared";
+import { RESOURCES, ACTIONS, RESOURCE_ACTIONS, DefaultRole } from "@konsinyasi/shared";
 import { hashPassword, verifyPassword } from "../lib/password";
 
 const auth = new Hono<AppEnv>();
@@ -17,12 +17,11 @@ const auth = new Hono<AppEnv>();
 // ---- Default Permissions for system roles ----
 function getDefaultPermissions(roleName: string): Array<{ resource: string; action: string }> {
   const allResources = Object.values(RESOURCES);
-  const allActions = Object.values(ACTIONS);
 
   if (roleName === DefaultRole.OWNER || roleName === DefaultRole.ADMIN) {
-    // Owner & Admin: full access to everything
+    // Owner & Admin: full access, terbatas pada aksi yang berlaku per resource
     return allResources.flatMap((resource) =>
-      allActions.map((action) => ({ resource, action }))
+      RESOURCE_ACTIONS[resource].map((action) => ({ resource, action }))
     );
   }
 
@@ -366,11 +365,10 @@ auth.get("/me", async (c) => {
   let permissions: Array<{ resource: string; action: string }> = [];
 
   if (userRoles.some((r) => r.roleName === "owner")) {
-    // Owner gets all permissions
+    // Owner gets all valid permissions (aksi yang berlaku per resource)
     const allResources = Object.values(RESOURCES);
-    const allActions = Object.values(ACTIONS);
     permissions = allResources.flatMap((resource) =>
-      allActions.map((action) => ({ resource, action }))
+      RESOURCE_ACTIONS[resource].map((action) => ({ resource, action }))
     );
   } else if (roleIds.length > 0) {
     const permResult = await db

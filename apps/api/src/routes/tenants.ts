@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
+import { requirePermission } from "../middleware/rbac";
 import { getDb, getNow } from "./helpers";
 import type { AppEnv } from "../index";
 
@@ -13,7 +14,7 @@ const tenants = new Hono<AppEnv>();
 tenants.use("*", authMiddleware);
 
 // GET / — Get current tenant info
-tenants.get("/", async (c) => {
+tenants.get("/", requirePermission("settings_company", "list"), async (c) => {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
 
@@ -23,7 +24,7 @@ tenants.get("/", async (c) => {
 });
 
 // PUT / — Update tenant
-tenants.put("/", async (c) => {
+tenants.put("/", requirePermission("settings_company", "edit"), async (c) => {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
   const body = await c.req.json();

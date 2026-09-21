@@ -50,6 +50,8 @@ export const accessControlProvider: AccessControlProvider = {
       "returns-agent": "return_agent",
       "returns-sales": "return_sales",
       reports: "reports",
+      "reports-stock": "reports",
+      "reports-distribution": "reports",
       "settings-company": "settings_company",
       "settings-users": "settings_users",
       "settings-roles": "settings_roles",

@@ -4,6 +4,7 @@
 
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
+import { isActionAllowedForResource } from "@konsinyasi/shared";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -12,6 +13,57 @@ import type { AppEnv } from "../index";
 
 const roles = new Hono<AppEnv>();
 roles.use("*", authMiddleware);
+
+type NormalizedPermission = {
+  resource: string;
+  action: string;
+  allowed: boolean;
+};
+
+/**
+ * Validasi & normalisasi daftar permission dari request.
+ * Menolak resource/action yang tidak berlaku dan membuang duplikat.
+ */
+function normalizePermissions(
+  raw: unknown
+):
+  | { ok: true; value: NormalizedPermission[] }
+  | { ok: false; error: string } {
+  if (raw === undefined || raw === null) {
+    return { ok: true, value: [] };
+  }
+
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "Format permissions tidak valid" };
+  }
+
+  const value: NormalizedPermission[] = [];
+  const seen = new Set<string>();
+
+  for (const perm of raw as Array<Record<string, unknown>>) {
+    const resource = perm?.resource;
+    const action = perm?.action;
+
+    if (
+      typeof resource !== "string" ||
+      typeof action !== "string" ||
+      !isActionAllowedForResource(resource, action)
+    ) {
+      return {
+        ok: false,
+        error: `Hak akses tidak valid: ${String(resource)}:${String(action)}`,
+      };
+    }
+
+    const key = `${resource}:${action}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    value.push({ resource, action, allowed: perm.allowed !== false });
+  }
+
+  return { ok: true, value };
+}
 
 // GET / — List roles
 roles.get("/", requirePermission("settings_roles", "list"), async (c) => {
@@ -57,6 +109,11 @@ roles.post("/", requirePermission("settings_roles", "create"), async (c) => {
   const now = getNow();
   const roleId = generateId();
 
+  const permissions = normalizePermissions(body.permissions);
+  if (!permissions.ok) {
+    return c.json({ success: false, error: permissions.error }, 400);
+  }
+
   await db.insert(schema.roles).values({
     id: roleId,
     tenant_id: tenantId,
@@ -68,17 +125,15 @@ roles.post("/", requirePermission("settings_roles", "create"), async (c) => {
   });
 
   // Insert permissions
-  if (body.permissions && Array.isArray(body.permissions)) {
-    for (const perm of body.permissions) {
-      await db.insert(schema.rolePermissions).values({
-        id: generateId(),
-        role_id: roleId,
-        resource: perm.resource,
-        action: perm.action,
-        allowed: perm.allowed !== false,
-        created_at: now,
-      });
-    }
+  for (const perm of permissions.value) {
+    await db.insert(schema.rolePermissions).values({
+      id: generateId(),
+      role_id: roleId,
+      resource: perm.resource,
+      action: perm.action,
+      allowed: perm.allowed,
+      created_at: now,
+    });
   }
 
   return c.json({ success: true, data: { id: roleId } }, 201);
@@ -92,6 +147,11 @@ roles.put("/:id", requirePermission("settings_roles", "edit"), async (c) => {
   const body = await c.req.json();
   const now = getNow();
 
+  const permissions = normalizePermissions(body.permissions);
+  if (!permissions.ok) {
+    return c.json({ success: false, error: permissions.error }, 400);
+  }
+
   await db
     .update(schema.roles)
     .set({
@@ -102,19 +162,17 @@ roles.put("/:id", requirePermission("settings_roles", "edit"), async (c) => {
     .where(and(eq(schema.roles.id, id), eq(schema.roles.tenant_id, tenantId)));
 
   // Replace permissions
-  if (body.permissions && Array.isArray(body.permissions)) {
-    await db.delete(schema.rolePermissions).where(eq(schema.rolePermissions.role_id, id));
+  await db.delete(schema.rolePermissions).where(eq(schema.rolePermissions.role_id, id));
 
-    for (const perm of body.permissions) {
-      await db.insert(schema.rolePermissions).values({
-        id: generateId(),
-        role_id: id,
-        resource: perm.resource,
-        action: perm.action,
-        allowed: perm.allowed !== false,
-        created_at: now,
-      });
-    }
+  for (const perm of permissions.value) {
+    await db.insert(schema.rolePermissions).values({
+      id: generateId(),
+      role_id: id,
+      resource: perm.resource,
+      action: perm.action,
+      allowed: perm.allowed,
+      created_at: now,
+    });
   }
 
   return c.json({ success: true, data: { id } });

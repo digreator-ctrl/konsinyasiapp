@@ -14,7 +14,7 @@ const reports = new Hono<AppEnv>();
 reports.use("*", authMiddleware);
 
 // GET /dashboard — Dashboard metrics
-reports.get("/dashboard", async (c) => {
+reports.get("/dashboard", requirePermission("dashboard", "list"), async (c) => {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
   const today = new Date().toISOString().split("T")[0];

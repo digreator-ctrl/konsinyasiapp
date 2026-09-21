@@ -25,7 +25,7 @@ users.get("/", requirePermission("settings_users", "list"), async (c) => {
     },
   });
 
-  const body = await res.json();
+  const body = (await res.json()) as any;
   const usersList = body.data as any[];
 
   if (usersList && usersList.length > 0) {

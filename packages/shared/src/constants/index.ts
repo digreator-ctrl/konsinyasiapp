@@ -116,7 +116,6 @@ export const RESOURCES = {
   DASHBOARD: "dashboard",
   PRODUCERS: "producers",
   PRODUCTS: "products",
-  SALES_TEAM: "sales_team",
   STORES: "stores",
   STOCK_ENTRIES: "stock_entries",
   WAREHOUSE: "warehouse",
@@ -145,6 +144,101 @@ export const ACTIONS = {
 } as const;
 
 export type ActionName = (typeof ACTIONS)[keyof typeof ACTIONS];
+
+// ---- Applicable actions per resource (RBAC) ----
+// Sumber kebenaran tunggal: hanya kombinasi resource:action di sini yang valid
+// dan ditampilkan pada matriks hak akses. Aksi EXPORT belum ditegakkan route
+// mana pun sehingga sengaja tidak dicantumkan.
+export const RESOURCE_ACTIONS: Record<ResourceName, readonly ActionName[]> = {
+  [RESOURCES.DASHBOARD]: [ACTIONS.LIST],
+  [RESOURCES.PRODUCERS]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+    ACTIONS.DELETE,
+  ],
+  [RESOURCES.PRODUCTS]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+    ACTIONS.DELETE,
+  ],
+  [RESOURCES.STORES]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+    ACTIONS.DELETE,
+  ],
+  [RESOURCES.STOCK_ENTRIES]: [ACTIONS.LIST, ACTIONS.SHOW, ACTIONS.CREATE],
+  [RESOURCES.WAREHOUSE]: [ACTIONS.LIST],
+  [RESOURCES.DISTRIBUTION_AGENT]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.APPROVE,
+  ],
+  [RESOURCES.DISTRIBUTION_SALES]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.APPROVE,
+  ],
+  [RESOURCES.CONSIGNMENTS]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+  ],
+  [RESOURCES.RETURN_AGENT]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.APPROVE,
+  ],
+  [RESOURCES.RETURN_SALES]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.APPROVE,
+  ],
+  [RESOURCES.REPORTS]: [ACTIONS.LIST],
+  [RESOURCES.SETTINGS_COMPANY]: [ACTIONS.LIST, ACTIONS.EDIT],
+  [RESOURCES.SETTINGS_USERS]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+    ACTIONS.DELETE,
+  ],
+  [RESOURCES.SETTINGS_ROLES]: [
+    ACTIONS.LIST,
+    ACTIONS.SHOW,
+    ACTIONS.CREATE,
+    ACTIONS.EDIT,
+    ACTIONS.DELETE,
+  ],
+};
+
+/**
+ * Aksi yang berlaku untuk sebuah resource.
+ * Mengembalikan array kosong bila resource tidak dikenal.
+ */
+export function actionsForResource(resource: string): readonly ActionName[] {
+  return RESOURCE_ACTIONS[resource as ResourceName] ?? [];
+}
+
+/**
+ * Apakah kombinasi resource:action termasuk hak akses yang valid.
+ */
+export function isActionAllowedForResource(
+  resource: string,
+  action: string
+): boolean {
+  return (actionsForResource(resource) as readonly string[]).includes(action);
+}
 
 // ---- User Status ----
 export enum UserStatus {

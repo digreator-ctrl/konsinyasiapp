@@ -3,15 +3,16 @@ import React from "react";
 import { useTable, useForm } from "@refinedev/antd";
 import { List, Create, Edit, EditButton, DeleteButton } from "@refinedev/antd";
 import { Table, Form, Input, Space, Tag, Checkbox, Card, Typography, Divider } from "antd";
-import { RESOURCES, ACTIONS } from "@konsinyasi/shared";
+import { RESOURCES, ACTIONS, isActionAllowedForResource } from "@konsinyasi/shared";
 
 const { Text } = Typography;
+
+type PermissionMap = Record<string, Record<string, boolean>>;
 
 const resourceLabels: Record<string, string> = {
   dashboard: "Dashboard",
   producers: "Data Produsen",
   products: "Data Barang",
-  sales_team: "Tim Sales",
   stores: "Data Toko",
   stock_entries: "Stok Masuk",
   warehouse: "Stok Gudang",
@@ -36,6 +37,86 @@ const actionLabels: Record<string, string> = {
   export: "Ekspor",
 };
 
+// Kolom aksi = gabungan aksi yang berlaku pada minimal satu resource.
+const actionColumns: string[] = Object.values(ACTIONS).filter((action) =>
+  Object.values(RESOURCES).some((resource) => isActionAllowedForResource(resource, action))
+);
+
+// Buang kombinasi resource:action yang tidak berlaku.
+const sanitizePermissions = (permMap: PermissionMap): PermissionMap => {
+  const result: PermissionMap = {};
+  for (const [resource, actions] of Object.entries(permMap)) {
+    for (const [action, allowed] of Object.entries(actions)) {
+      if (!isActionAllowedForResource(resource, action)) continue;
+      if (!result[resource]) result[resource] = {};
+      result[resource][action] = allowed;
+    }
+  }
+  return result;
+};
+
+const PermissionMatrix: React.FC<{
+  permissions: PermissionMap;
+  onChange: (resource: string, action: string, checked: boolean) => void;
+}> = ({ permissions, onChange }) => (
+  <Card size="small" style={{ borderRadius: 10, overflowX: "auto" }}>
+    <style>{`
+      .matrix-checkbox .ant-checkbox-inner {
+        border-color: rgba(255, 255, 255, 0.3) !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+      }
+      .matrix-checkbox:hover .ant-checkbox-inner {
+        border-color: #4F46E5 !important;
+      }
+      .matrix-checkbox .ant-checkbox-checked .ant-checkbox-inner {
+        background-color: #4F46E5 !important;
+        border-color: #4F46E5 !important;
+      }
+    `}</style>
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr>
+          <th style={{ textAlign: "left", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)" }}>Resource</th>
+          {actionColumns.map((action) => (
+            <th key={action} style={{ textAlign: "center", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)", fontSize: 12 }}>
+              {actionLabels[action] || action}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {Object.values(RESOURCES).map((resource) => (
+          <tr key={resource}>
+            <td style={{ padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
+              <Text>{resourceLabels[resource] || resource}</Text>
+            </td>
+            {actionColumns.map((action) => (
+              <td key={action} style={{ textAlign: "center", padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
+                {isActionAllowedForResource(resource, action) ? (
+                  <Checkbox
+                    className="matrix-checkbox"
+                    checked={permissions[resource]?.[action] || false}
+                    onChange={(e) => onChange(resource, action, e.target.checked)}
+                  />
+                ) : (
+                  <Text type="secondary" style={{ opacity: 0.4 }}>–</Text>
+                )}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </Card>
+);
+
+const toPermissionList = (permissions: PermissionMap) =>
+  Object.entries(permissions).flatMap(([resource, actions]) =>
+    Object.entries(actions)
+      .filter(([action, allowed]) => allowed && isActionAllowedForResource(resource, action))
+      .map(([action]) => ({ resource, action, allowed: true }))
+  );
+
 export const RoleList: React.FC = () => {
   const { tableProps } = useTable({ resource: "roles", syncWithLocation: true });
   return (
@@ -57,7 +138,7 @@ export const RoleList: React.FC = () => {
 
 export const RoleCreate: React.FC = () => {
   const { formProps, saveButtonProps } = useForm({ resource: "roles" });
-  const [permissions, setPermissions] = React.useState<Record<string, Record<string, boolean>>>({});
+  const [permissions, setPermissions] = React.useState<PermissionMap>({});
 
   const handlePermissionChange = (resource: string, action: string, checked: boolean) => {
     setPermissions((prev) => ({
@@ -67,10 +148,7 @@ export const RoleCreate: React.FC = () => {
   };
 
   const handleFinish = (values: any) => {
-    const permList = Object.entries(permissions).flatMap(([resource, actions]) =>
-      Object.entries(actions).filter(([_, allowed]) => allowed).map(([action]) => ({ resource, action, allowed: true }))
-    );
-    formProps.onFinish?.({ ...values, permissions: permList });
+    formProps.onFinish?.({ ...values, permissions: toPermissionList(permissions) });
   };
 
   return (
@@ -80,37 +158,7 @@ export const RoleCreate: React.FC = () => {
         <Form.Item label="Deskripsi" name="description"><Input.TextArea rows={2} /></Form.Item>
 
         <Divider>Matriks Hak Akses</Divider>
-        <Card size="small" style={{ borderRadius: 10, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)" }}>Resource</th>
-                {Object.values(ACTIONS).map((action) => (
-                  <th key={action} style={{ textAlign: "center", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)", fontSize: 12 }}>
-                    {actionLabels[action] || action}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.values(RESOURCES).map((resource) => (
-                <tr key={resource}>
-                  <td style={{ padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
-                    <Text>{resourceLabels[resource] || resource}</Text>
-                  </td>
-                  {Object.values(ACTIONS).map((action) => (
-                    <td key={action} style={{ textAlign: "center", padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
-                      <Checkbox
-                        checked={permissions[resource]?.[action] || false}
-                        onChange={(e) => handlePermissionChange(resource, action, e.target.checked)}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <PermissionMatrix permissions={permissions} onChange={handlePermissionChange} />
       </Form>
     </Create>
   );
@@ -119,16 +167,16 @@ export const RoleCreate: React.FC = () => {
 export const RoleEdit: React.FC = () => {
   const { formProps, saveButtonProps, queryResult } = useForm({ resource: "roles" });
   const record = queryResult?.data?.data;
-  const [permissions, setPermissions] = React.useState<Record<string, Record<string, boolean>>>({});
+  const [permissions, setPermissions] = React.useState<PermissionMap>({});
 
   React.useEffect(() => {
     if (record?.permissions) {
-      const permMap: Record<string, Record<string, boolean>> = {};
+      const permMap: PermissionMap = {};
       for (const p of record.permissions) {
         if (!permMap[p.resource]) permMap[p.resource] = {};
         permMap[p.resource][p.action] = p.allowed;
       }
-      setPermissions(permMap);
+      setPermissions(sanitizePermissions(permMap));
     }
   }, [record]);
 
@@ -140,10 +188,7 @@ export const RoleEdit: React.FC = () => {
   };
 
   const handleFinish = (values: any) => {
-    const permList = Object.entries(permissions).flatMap(([resource, actions]) =>
-      Object.entries(actions).filter(([_, allowed]) => allowed).map(([action]) => ({ resource, action, allowed: true }))
-    );
-    formProps.onFinish?.({ ...values, permissions: permList });
+    formProps.onFinish?.({ ...values, permissions: toPermissionList(permissions) });
   };
 
   return (
@@ -153,37 +198,7 @@ export const RoleEdit: React.FC = () => {
         <Form.Item label="Deskripsi" name="description"><Input.TextArea rows={2} /></Form.Item>
 
         <Divider>Matriks Hak Akses</Divider>
-        <Card size="small" style={{ borderRadius: 10, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)" }}>Resource</th>
-                {Object.values(ACTIONS).map((action) => (
-                  <th key={action} style={{ textAlign: "center", padding: 8, color: "#94A3B8", borderBottom: "1px solid rgba(148,163,184,0.12)", fontSize: 12 }}>
-                    {actionLabels[action] || action}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.values(RESOURCES).map((resource) => (
-                <tr key={resource}>
-                  <td style={{ padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
-                    <Text>{resourceLabels[resource] || resource}</Text>
-                  </td>
-                  {Object.values(ACTIONS).map((action) => (
-                    <td key={action} style={{ textAlign: "center", padding: 8, borderBottom: "1px solid rgba(148,163,184,0.06)" }}>
-                      <Checkbox
-                        checked={permissions[resource]?.[action] || false}
-                        onChange={(e) => handlePermissionChange(resource, action, e.target.checked)}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <PermissionMatrix permissions={permissions} onChange={handlePermissionChange} />
       </Form>
     </Edit>
   );

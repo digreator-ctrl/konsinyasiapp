@@ -108,7 +108,7 @@ app.onError((err, c) => {
   return c.json(
     {
       success: false,
-      error: "Terjadi kesalahan internal server",
+      error: err.message || "Terjadi kesalahan internal server",
     },
     500
   );

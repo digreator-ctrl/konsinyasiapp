@@ -66,7 +66,7 @@ import { ReturnSalesList, ReturnSalesCreate, ReturnSalesShow } from "./pages/ret
 import { StockMovementReport } from "./pages/reports/stock-movement";
 import { DistributionReport } from "./pages/reports/distribution";
 import { CompanySettings } from "./pages/settings/company";
-import { UserList, UserCreate, UserEdit } from "./pages/settings/users";
+import { UserList, UserCreate, UserEdit, UserShow } from "./pages/settings/users";
 import { RoleList, RoleCreate, RoleEdit } from "./pages/settings/roles";
 
 // Import Ant Design styles
@@ -438,6 +438,7 @@ function App() {
                 list: "/settings/users",
                 create: "/settings/users/create",
                 edit: "/settings/users/edit/:id",
+                show: "/settings/users/show/:id",
                 meta: {
                   label: "Manajemen Pengguna",
                   parent: "settings",
@@ -572,6 +573,7 @@ function App() {
                 <Route path="/settings/company" element={<CompanySettings />} />
                 <Route path="/settings/users">
                   <Route index element={<UserList />} />
+                  <Route path="show/:id" element={<UserShow />} />
                   <Route path="create" element={<UserCreate />} />
                   <Route path="edit/:id" element={<UserEdit />} />
                 </Route>
