@@ -6,22 +6,45 @@ import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
-import { requirePermission } from "../middleware/rbac";
+import { requirePermission, assertPermission } from "../middleware/rbac";
 import { getDb, generateId, getNow, paginatedList } from "./helpers";
+import { getSalesStock, adjustSalesStock, listSalesStock } from "../services/sales-stock";
 import type { AppEnv } from "../index";
 
 const consignments = new Hono<AppEnv>();
 consignments.use("*", authMiddleware);
 
+// GET /available-stock — Stock currently carried by the caller (sales)
+consignments.get("/available-stock", async (c) => {
+  await assertPermission(c, "consignments", "list");
+
+  const db = getDb(c);
+  const tenantId = c.get("tenantId");
+  const userId = c.get("userId");
+  const requestedSalesId = new URL(c.req.url).searchParams.get("sales_id");
+
+  const roles = c.get("userRoles");
+  const isSalesOnly =
+    roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  const salesId = isSalesOnly ? userId : requestedSalesId || userId;
+
+  const stock = await listSalesStock(db, tenantId, salesId);
+  return c.json({ success: true, data: stock, total: stock.length });
+});
+
 consignments.get("/", requirePermission("consignments", "list"), async (c) => {
   const roles = c.get("userRoles");
   const userId = c.get("userId");
   const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
-  
+
   const additionalFilters = isSales ? [eq(schema.consignments.sales_id, userId)] : [];
-  
+
   return paginatedList(c, schema.consignments, schema.consignments.tenant_id, {
-    additionalFilters
+    additionalFilters,
+    sortableCols: {
+      consignment_date: schema.consignments.consignment_date,
+      status: schema.consignments.status,
+    },
   });
 });
 
@@ -75,10 +98,34 @@ consignments.get("/:id", requirePermission("consignments", "show"), async (c) =>
 consignments.post("/", requirePermission("consignments", "create"), async (c) => {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
-  const salesId = c.get("userId");
+  const userId = c.get("userId");
+  const roles = c.get("userRoles");
   const body = await c.req.json();
   const now = getNow();
   const consignmentId = generateId();
+
+  const isSalesOnly =
+    roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  const salesId = isSalesOnly ? userId : body.sales_id || userId;
+
+  const items: any[] = body.items || [];
+  if (items.length === 0) {
+    return c.json({ success: false, error: "Minimal 1 item harus diisi" }, 400);
+  }
+
+  // Validate the sales person actually carries enough stock for each batch
+  for (const item of items) {
+    const available = await getSalesStock(db, salesId, item.batch_id);
+    if (available < item.quantity_consigned) {
+      return c.json(
+        {
+          success: false,
+          error: `Stok tidak mencukupi untuk batch ${item.batch_id}. Tersedia: ${available}, diminta: ${item.quantity_consigned}.`,
+        },
+        400
+      );
+    }
+  }
 
   // Optionally create store visit
   let visitId: string | null = null;
@@ -110,7 +157,7 @@ consignments.post("/", requirePermission("consignments", "create"), async (c) =>
     updated_at: now,
   });
 
-  for (const item of body.items || []) {
+  for (const item of items) {
     await db.insert(schema.consignmentItems).values({
       id: generateId(),
       consignment_id: consignmentId,
@@ -123,6 +170,13 @@ consignments.post("/", requirePermission("consignments", "create"), async (c) =>
       created_at: now,
       updated_at: now,
     });
+
+    // Move stock from sales hands to the store
+    await adjustSalesStock(
+      db,
+      { tenantId, salesId, productId: item.product_id, batchId: item.batch_id },
+      -item.quantity_consigned
+    );
   }
 
   return c.json({ success: true, data: { id: consignmentId } }, 201);
@@ -131,7 +185,6 @@ consignments.post("/", requirePermission("consignments", "create"), async (c) =>
 // PUT /:id/update-sold — Update penjualan dari konsinyasi
 consignments.put("/:id/update-sold", requirePermission("consignments", "edit"), async (c) => {
   const db = getDb(c);
-  const tenantId = c.get("tenantId");
   const id = c.req.param("id");
   const body = await c.req.json();
   const now = getNow();

@@ -15,6 +15,13 @@
       "when": 1789863265262,
       "tag": "0001_overrated_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789972790927,
+      "tag": "0002_thick_ultragirl",
+      "breakpoints": true
     }
   ]
 }

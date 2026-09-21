@@ -5,6 +5,7 @@ import { useShow } from "@refinedev/core";
 import { List, Create, Show, ShowButton } from "@refinedev/antd";
 import { Table, Form, Input, InputNumber, Space, Tag, Descriptions, Button } from "antd";
 import { Plus, Trash2 } from "lucide-react";
+import { WarehouseBatchPicker } from "../../../components/pickers";
 
 export const DistributionAgentList: React.FC = () => {
   const { tableProps } = useTable({ resource: "distributions", meta: { query: { channel: "agent" } }, syncWithLocation: true });
@@ -30,16 +31,18 @@ export const DistributionAgentCreate: React.FC = () => {
     <Create saveButtonProps={saveButtonProps} title="Buat Order Agen">
       <Form {...formProps} layout="vertical" initialValues={{ channel: "agent", items: [{}] }}>
         <Form.Item name="channel" hidden><Input /></Form.Item>
-        <Form.Item label="ID Agen" name="recipient_id" rules={[{ required: true }]}><Input placeholder="ID agen" /></Form.Item>
-        <Form.Item label="Nama Agen" name="recipient_name"><Input placeholder="Nama agen" /></Form.Item>
+        <Form.Item label="Nama Agen" name="recipient_name" rules={[{ required: true, message: "Nama agen wajib diisi" }]}>
+          <Input placeholder="Nama agen / toko pembeli" />
+        </Form.Item>
         <Form.List name="items">
           {(fields, { add, remove }) => (<>
-            {fields.map((field, index) => (
-              <Space key={field.key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
-                <Form.Item {...field} name={[field.name, "product_id"]} label="Produk" rules={[{ required: true }]}><Input placeholder="ID Produk" style={{ width: 200 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "batch_id"]} label="Batch" rules={[{ required: true }]}><Input placeholder="ID Batch" style={{ width: 200 }} /></Form.Item>
+            {fields.map((field) => (
+              <Space key={field.key} style={{ display: "flex", marginBottom: 8, flexWrap: "wrap" }} align="baseline">
+                <WarehouseBatchPicker fieldName={field.name} />
                 <Form.Item {...field} name={[field.name, "quantity"]} label="Jumlah" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 100 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}><InputNumber min={0} style={{ width: 150 }} /></Form.Item>
+                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}>
+                  <InputNumber<number> min={0} style={{ width: 150 }} />
+                </Form.Item>
                 {fields.length > 1 && <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => remove(field.name)} />}
               </Space>
             ))}

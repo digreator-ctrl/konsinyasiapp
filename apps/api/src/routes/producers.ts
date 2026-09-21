@@ -15,7 +15,8 @@ producers.use("*", authMiddleware);
 
 producers.get("/", requirePermission("producers", "list"), async (c) => {
   return paginatedList(c, schema.producers, schema.producers.tenant_id, {
-    searchCol: schema.producers.name,
+    searchCols: [schema.producers.name, schema.producers.contact_person],
+    sortableCols: { name: schema.producers.name, created_at: schema.producers.created_at },
   });
 });
 

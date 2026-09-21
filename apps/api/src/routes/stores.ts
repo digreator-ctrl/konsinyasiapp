@@ -15,7 +15,8 @@ stores.use("*", authMiddleware);
 
 stores.get("/", requirePermission("stores", "list"), async (c) => {
   return paginatedList(c, schema.stores, schema.stores.tenant_id, {
-    searchCol: schema.stores.name,
+    searchCols: [schema.stores.name, schema.stores.area],
+    sortableCols: { name: schema.stores.name, created_at: schema.stores.created_at },
   });
 });
 

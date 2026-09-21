@@ -1,11 +1,11 @@
 // Distribution Sales Pages (Jalur B: Request/Assign)
 import React from "react";
 import { useTable, useForm } from "@refinedev/antd";
-import { useShow, useCustomMutation } from "@refinedev/core";
-import { useNotification } from "@refinedev/core";
+import { useShow } from "@refinedev/core";
 import { List, Create, Show, ShowButton } from "@refinedev/antd";
-import { Table, Form, Input, Select, InputNumber, Space, Tag, Descriptions, Button, Modal } from "antd";
-import { Plus, Trash2, Check, X } from "lucide-react";
+import { Table, Form, Input, Select, InputNumber, Space, Tag, Descriptions, Button } from "antd";
+import { Plus, Trash2 } from "lucide-react";
+import { WarehouseBatchPicker, SalesSelect } from "../../../components/pickers";
 
 export const DistributionSalesList: React.FC = () => {
   const { tableProps } = useTable({ resource: "distributions", meta: { query: { channel: "sales" } }, syncWithLocation: true });
@@ -36,16 +36,16 @@ export const DistributionSalesCreate: React.FC = () => {
         <Form.Item label="Metode" name="method" rules={[{ required: true }]}>
           <Select options={[{ label: "Request by Sales (Sales Ajukan)", value: "request_by_sales" }, { label: "Assign by Admin (Admin Tugaskan)", value: "assign_by_admin" }]} />
         </Form.Item>
-        <Form.Item label="ID Sales" name="recipient_id" rules={[{ required: true }]}><Input placeholder="ID Sales" /></Form.Item>
-        <Form.Item label="Nama Sales" name="recipient_name"><Input placeholder="Nama Sales" /></Form.Item>
+        <SalesSelect name="recipient_id" nameField="recipient_name" label="Sales Penerima" />
         <Form.List name="items">
           {(fields, { add, remove }) => (<>
             {fields.map((field) => (
-              <Space key={field.key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
-                <Form.Item {...field} name={[field.name, "product_id"]} label="Produk" rules={[{ required: true }]}><Input placeholder="ID Produk" style={{ width: 200 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "batch_id"]} label="Batch" rules={[{ required: true }]}><Input placeholder="ID Batch" style={{ width: 200 }} /></Form.Item>
+              <Space key={field.key} style={{ display: "flex", marginBottom: 8, flexWrap: "wrap" }} align="baseline">
+                <WarehouseBatchPicker fieldName={field.name} />
                 <Form.Item {...field} name={[field.name, "quantity"]} label="Jumlah" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 100 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}><InputNumber min={0} style={{ width: 150 }} /></Form.Item>
+                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}>
+                  <InputNumber<number> min={0} style={{ width: 150 }} />
+                </Form.Item>
                 {fields.length > 1 && <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => remove(field.name)} />}
               </Space>
             ))}

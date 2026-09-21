@@ -3,11 +3,12 @@
 // ============================================================
 
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import { getDb, generateId, getNow, paginatedList } from "./helpers";
+import { hashPassword } from "../lib/password";
 import type { AppEnv } from "../index";
 
 const users = new Hono<AppEnv>();
@@ -15,9 +16,40 @@ users.use("*", authMiddleware);
 
 // GET / — List users
 users.get("/", requirePermission("settings_users", "list"), async (c) => {
-  return paginatedList(c, schema.users, schema.users.tenant_id, {
-    searchCol: schema.users.name,
+  const res = await paginatedList(c, schema.users, schema.users.tenant_id, {
+    searchCols: [schema.users.name, schema.users.email],
+    sortableCols: {
+      name: schema.users.name,
+      email: schema.users.email,
+      created_at: schema.users.created_at,
+    },
   });
+
+  const body = await res.json();
+  const usersList = body.data as any[];
+
+  if (usersList && usersList.length > 0) {
+    const db = getDb(c);
+    const userIds = usersList.map((u: any) => u.id);
+    
+    // Fetch roles for all these users
+    const userRoles = await db
+      .select({
+        user_id: schema.userRoles.user_id,
+        id: schema.roles.id,
+        name: schema.roles.name,
+      })
+      .from(schema.roles)
+      .innerJoin(schema.userRoles, eq(schema.roles.id, schema.userRoles.role_id))
+      .where(inArray(schema.userRoles.user_id, userIds));
+
+    // Attach roles
+    usersList.forEach((u: any) => {
+      u.roles = userRoles.filter((ur) => ur.user_id === u.id).map((ur) => ({ id: ur.id, name: ur.name }));
+    });
+  }
+
+  return c.json(body);
 });
 
 // GET /:id — Get user detail
@@ -62,11 +94,7 @@ users.post("/", requirePermission("settings_users", "create"), async (c) => {
   const userId = generateId();
 
   // Hash password
-  const encoder = new TextEncoder();
-  const data = encoder.encode(body.password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashedPassword = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hashedPassword = await hashPassword(body.password);
 
   await db.insert(schema.users).values({
     id: userId,

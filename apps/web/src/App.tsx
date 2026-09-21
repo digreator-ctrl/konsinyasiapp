@@ -43,6 +43,7 @@ import {
 import { dataProvider } from "./providers/dataProvider";
 import { authProvider } from "./providers/authProvider";
 import { accessControlProvider } from "./providers/accessControlProvider";
+import { i18nProvider } from "./providers/i18nProvider";
 
 // Theme
 import { antdTheme } from "./styles/theme";
@@ -54,6 +55,7 @@ import { DashboardPage } from "./pages/dashboard";
 import { ProducerList, ProducerCreate, ProducerEdit, ProducerShow } from "./pages/producers";
 import { ProductList, ProductCreate, ProductEdit, ProductShow } from "./pages/products";
 import { StoreList, StoreCreate, StoreEdit, StoreShow } from "./pages/stores";
+import { SalesTeamPage } from "./pages/sales-team";
 import { StockEntryList, StockEntryCreate, StockEntryShow } from "./pages/stock-entries";
 import { WarehousePage } from "./pages/warehouse";
 import { DistributionAgentList, DistributionAgentCreate, DistributionAgentShow } from "./pages/distributions/agent";
@@ -231,6 +233,7 @@ function App() {
             dataProvider={dataProvider}
             authProvider={authProvider}
             accessControlProvider={accessControlProvider}
+            i18nProvider={i18nProvider}
             routerProvider={routerProvider}
             notificationProvider={useNotificationProvider}
             resources={[
@@ -283,6 +286,15 @@ function App() {
                   label: "Data Toko",
                   parent: "master-data",
                   icon: <Store size={18} />,
+                },
+              },
+              {
+                name: "sales-team",
+                list: "/sales-team",
+                meta: {
+                  label: "Tim Sales",
+                  parent: "master-data",
+                  icon: <Users size={18} />,
                 },
               },
               {
@@ -507,6 +519,8 @@ function App() {
                   <Route path="edit/:id" element={<StoreEdit />} />
                   <Route path="show/:id" element={<StoreShow />} />
                 </Route>
+
+                <Route path="/sales-team" element={<SalesTeamPage />} />
 
                 {/* Stok & Inventori */}
                 <Route path="/stock-entries">

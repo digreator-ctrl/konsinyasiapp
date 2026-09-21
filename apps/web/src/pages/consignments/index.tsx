@@ -1,10 +1,11 @@
 // Consignment Pages (Sales → Toko)
 import React from "react";
-import { useTable, useForm } from "@refinedev/antd";
+import { useTable, useForm, useSelect } from "@refinedev/antd";
 import { useShow } from "@refinedev/core";
 import { List, Create, Show, ShowButton } from "@refinedev/antd";
-import { Table, Form, Input, InputNumber, Space, Tag, Descriptions, Button } from "antd";
+import { Table, Form, Input, InputNumber, Space, Tag, Descriptions, Button, Select } from "antd";
 import { Plus, Trash2 } from "lucide-react";
+import { ConsignmentStockPicker, SalesSelect } from "../../components/pickers";
 
 export const ConsignmentList: React.FC = () => {
   const { tableProps } = useTable({ resource: "consignments", syncWithLocation: true });
@@ -26,19 +27,31 @@ export const ConsignmentList: React.FC = () => {
 
 export const ConsignmentCreate: React.FC = () => {
   const { formProps, saveButtonProps } = useForm({ resource: "consignments" });
+  const { selectProps: storeSelectProps } = useSelect({
+    resource: "stores",
+    optionLabel: "name",
+    optionValue: "id",
+    pagination: { pageSize: 200 },
+  });
+
   return (
     <Create saveButtonProps={saveButtonProps} title="Titipkan Barang ke Toko">
       <Form {...formProps} layout="vertical" initialValues={{ items: [{}], create_visit: true }}>
-        <Form.Item label="ID Toko" name="store_id" rules={[{ required: true }]}><Input placeholder="Pilih atau masukkan ID toko" /></Form.Item>
+        <Form.Item name="create_visit" hidden><Input /></Form.Item>
+        <Form.Item label="Toko" name="store_id" rules={[{ required: true, message: "Pilih toko" }]}>
+          <Select {...storeSelectProps} showSearch optionFilterProp="label" placeholder="Pilih toko" />
+        </Form.Item>
+        <SalesSelect name="sales_id" nameField="sales_name" label="Sales (opsional)" required={false} />
         <Form.Item label="Tanggal Konsinyasi" name="consignment_date" rules={[{ required: true }]}><Input type="date" /></Form.Item>
         <Form.List name="items">
           {(fields, { add, remove }) => (<>
             {fields.map((field) => (
-              <Space key={field.key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
-                <Form.Item {...field} name={[field.name, "product_id"]} label="Produk" rules={[{ required: true }]}><Input placeholder="ID Produk" style={{ width: 180 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "batch_id"]} label="Batch" rules={[{ required: true }]}><Input placeholder="ID Batch" style={{ width: 180 }} /></Form.Item>
+              <Space key={field.key} style={{ display: "flex", marginBottom: 8, flexWrap: "wrap" }} align="baseline">
+                <ConsignmentStockPicker fieldName={field.name} />
                 <Form.Item {...field} name={[field.name, "quantity_consigned"]} label="Qty Titip" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 100 }} /></Form.Item>
-                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}><InputNumber min={0} style={{ width: 130 }} /></Form.Item>
+                <Form.Item {...field} name={[field.name, "price"]} label="Harga" rules={[{ required: true }]}>
+                  <InputNumber<number> min={0} style={{ width: 150 }} />
+                </Form.Item>
                 {fields.length > 1 && <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => remove(field.name)} />}
               </Space>
             ))}

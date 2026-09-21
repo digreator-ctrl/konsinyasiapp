@@ -16,7 +16,8 @@ roles.use("*", authMiddleware);
 // GET / — List roles
 roles.get("/", requirePermission("settings_roles", "list"), async (c) => {
   return paginatedList(c, schema.roles, schema.roles.tenant_id, {
-    searchCol: schema.roles.name,
+    searchCols: [schema.roles.name],
+    sortableCols: { name: schema.roles.name, created_at: schema.roles.created_at },
   });
 });
 

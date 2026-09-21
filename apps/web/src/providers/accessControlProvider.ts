@@ -41,6 +41,7 @@ export const accessControlProvider: AccessControlProvider = {
       producers: "producers",
       products: "products",
       stores: "stores",
+      "sales-team": "distribution_sales",
       "stock-entries": "stock_entries",
       warehouse: "warehouse",
       "distributions-agent": "distribution_agent",
@@ -52,7 +53,26 @@ export const accessControlProvider: AccessControlProvider = {
       "settings-company": "settings_company",
       "settings-users": "settings_users",
       "settings-roles": "settings_roles",
+      users: "settings_users",
+      roles: "settings_roles",
+      tenants: "settings_company",
     };
+
+    // Resources that may be satisfied by any of several permissions
+    const resourceGroups: Record<string, string[]> = {
+      distributions: ["distribution_agent", "distribution_sales"],
+      returns: ["return_agent", "return_sales"],
+    };
+
+    const group = resourceGroups[resource];
+    if (group) {
+      const allowed = permissions.some(
+        (p) => group.includes(p.resource) && p.action === action
+      );
+      return allowed
+        ? { can: true }
+        : { can: false, reason: `Anda tidak memiliki akses untuk ${action} pada ${resource}` };
+    }
 
     const mappedResource = resourceMap[resource] || resource;
 

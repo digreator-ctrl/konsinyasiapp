@@ -596,3 +596,34 @@ export const mediaFiles = sqliteTable(
     entityIdx: index("media_files_entity_idx").on(table.entity_type, table.entity_id),
   })
 );
+
+// ============================================================
+// 24. SALES_STOCKS — Stok yang Dibawa Sales (setelah distribusi)
+// ============================================================
+export const salesStocks = sqliteTable(
+  "sales_stocks",
+  {
+    id: text("id").primaryKey(),
+    tenant_id: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    sales_id: text("sales_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    product_id: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    batch_id: text("batch_id")
+      .notNull()
+      .references(() => stockBatches.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull().default(0),
+    created_at: createdAt,
+    updated_at: updatedAt,
+  },
+  (table) => ({
+    salesBatchIdx: uniqueIndex("sales_stocks_sales_batch_idx").on(table.sales_id, table.batch_id),
+    tenantIdx: index("sales_stocks_tenant_idx").on(table.tenant_id),
+    salesIdx: index("sales_stocks_sales_idx").on(table.sales_id),
+    productIdx: index("sales_stocks_product_idx").on(table.product_id),
+  })
+);

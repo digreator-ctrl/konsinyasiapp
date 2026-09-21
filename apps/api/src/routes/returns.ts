@@ -6,26 +6,48 @@ import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
-import { requirePermission } from "../middleware/rbac";
+import { assertPermission, assertAnyPermission } from "../middleware/rbac";
 import { getDb, generateId, getNow, paginatedList } from "./helpers";
+import { adjustSalesStock } from "../services/sales-stock";
 import type { AppEnv } from "../index";
 
 const returns = new Hono<AppEnv>();
 returns.use("*", authMiddleware);
 
+const sourceResource = (source: string | null) =>
+  source === "agent" ? "return_agent" : "return_sales";
+
 returns.get("/", async (c) => {
+  const url = new URL(c.req.url);
+  const source = url.searchParams.get("source");
+
+  // Which resource the caller must be allowed to list
+  await assertAnyPermission(c, ["return_agent", "return_sales"], "list");
+
   const roles = c.get("userRoles");
   const userId = c.get("userId");
   const isSales = roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
-  
-  const additionalFilters = isSales ? [eq(schema.returns.source_id, userId)] : [];
+
+  const additionalFilters: any[] = [];
+  if (source) {
+    additionalFilters.push(eq(schema.returns.source, source));
+  }
+  if (isSales) {
+    additionalFilters.push(eq(schema.returns.source_id, userId));
+  }
 
   return paginatedList(c, schema.returns, schema.returns.tenant_id, {
-    additionalFilters
+    additionalFilters,
+    sortableCols: {
+      return_date: schema.returns.return_date,
+      status: schema.returns.status,
+    },
   });
 });
 
 returns.get("/:id", async (c) => {
+  await assertAnyPermission(c, ["return_agent", "return_sales"], "show");
+
   const db = getDb(c);
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
@@ -69,15 +91,24 @@ returns.get("/:id", async (c) => {
 returns.post("/", async (c) => {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
+  const userId = c.get("userId");
+  const roles = c.get("userRoles");
   const body = await c.req.json();
   const now = getNow();
   const returnId = generateId();
 
+  const isSalesOnly =
+    roles.includes("sales") && !roles.includes("admin") && !roles.includes("owner");
+  const source = isSalesOnly ? "sales" : body.source;
+  const sourceId = isSalesOnly ? userId : body.source_id;
+
+  await assertPermission(c, sourceResource(source), "create");
+
   await db.insert(schema.returns).values({
     id: returnId,
     tenant_id: tenantId,
-    source: body.source,
-    source_id: body.source_id,
+    source,
+    source_id: sourceId,
     distribution_id: body.distribution_id || null,
     status: "submitted",
     return_date: body.return_date || now.split("T")[0],
@@ -105,6 +136,8 @@ returns.post("/", async (c) => {
 
 // POST /:id/process — Process return (verify & complete)
 returns.post("/:id/process", async (c) => {
+  await assertAnyPermission(c, ["return_agent", "return_sales"], "approve");
+
   const db = getDb(c);
   const tenantId = c.get("tenantId");
   const id = c.req.param("id");
@@ -126,29 +159,46 @@ returns.post("/:id/process", async (c) => {
     .set({ status: newStatus, updated_at: now })
     .where(eq(schema.returns.id, id));
 
-  // For agent returns with status "processed": auto-generate replacement distribution
-  if (newStatus === "processed" && ret[0].source === "agent") {
+  if (newStatus === "processed") {
     const returnItemsList = await db
       .select()
       .from(schema.returnItems)
       .where(eq(schema.returnItems.return_id, id));
 
-    // Create a replacement distribution (draft)
-    const replacementDistId = generateId();
-    await db.insert(schema.distributions).values({
-      id: replacementDistId,
-      tenant_id: tenantId,
-      channel: "agent",
-      recipient_id: ret[0].source_id,
-      recipient_name: null,
-      status: "draft",
-      total_amount: 0,
-      notes: `Penggantian retur #${id}`,
-      created_at: now,
-      updated_at: now,
-    });
+    // Sales returns: stock goes back to the sales person's hands
+    if (ret[0].source === "sales") {
+      for (const item of returnItemsList) {
+        if (!item.batch_id) continue;
+        await adjustSalesStock(
+          db,
+          {
+            tenantId,
+            salesId: ret[0].source_id,
+            productId: item.product_id,
+            batchId: item.batch_id,
+          },
+          item.quantity
+        );
+      }
+    }
 
-    // Note: Items need to be manually selected by admin from available batches
+    // Agent returns: auto-generate a draft replacement distribution
+    if (ret[0].source === "agent") {
+      const replacementDistId = generateId();
+      await db.insert(schema.distributions).values({
+        id: replacementDistId,
+        tenant_id: tenantId,
+        channel: "agent",
+        recipient_id: ret[0].source_id,
+        recipient_name: null,
+        status: "draft",
+        total_amount: 0,
+        notes: `Penggantian retur #${id}`,
+        created_at: now,
+        updated_at: now,
+      });
+      // Note: Items need to be manually selected by admin from available batches
+    }
   }
 
   return c.json({ success: true, data: { id, status: newStatus } });

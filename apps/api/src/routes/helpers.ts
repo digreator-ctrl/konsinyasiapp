@@ -4,7 +4,7 @@
 // ============================================================
 
 import { drizzle } from "drizzle-orm/d1";
-import { eq, and, like, desc, asc, sql } from "drizzle-orm";
+import { eq, and, or, like, asc, desc, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { Context } from "hono";
@@ -25,41 +25,53 @@ export function getNow(): string {
   return new Date().toISOString();
 }
 
+interface PaginatedListOptions {
+  additionalFilters?: any[];
+  /** Columns searched by the `_search` query param (OR-ed together). */
+  searchCols?: any[];
+  /** Map of sortable field name → Drizzle column. Unknown fields are ignored. */
+  sortableCols?: Record<string, any>;
+  /** Fallback ordering column when no valid `_sort` is provided. */
+  defaultSortCol?: any;
+  /** Default sort direction (defaults to "desc"). */
+  defaultSortDir?: "asc" | "desc";
+}
+
 /**
- * Build a paginated list response.
+ * Build a paginated list response supporting `_page`, `_pageSize`, `_search`,
+ * `_sort` and `_order` query params.
  */
 export async function paginatedList<T extends SQLiteTable>(
   c: Context<AppEnv>,
   table: T,
   tenantIdCol: any,
-  options?: {
-    additionalFilters?: any[];
-    searchCol?: any;
-    orderByCol?: any;
-    orderDir?: "asc" | "desc";
-  }
+  options?: PaginatedListOptions
 ) {
   const db = getDb(c);
   const tenantId = c.get("tenantId");
 
   const url = new URL(c.req.url);
-  const page = parseInt(url.searchParams.get("_page") || "1", 10);
-  const pageSize = Math.min(parseInt(url.searchParams.get("_pageSize") || "10", 10), 100);
+  const page = Math.max(parseInt(url.searchParams.get("_page") || "1", 10) || 1, 1);
+  const pageSize = Math.min(
+    Math.max(parseInt(url.searchParams.get("_pageSize") || "10", 10) || 10, 1),
+    100
+  );
   const search = url.searchParams.get("_search") || "";
   const sortField = url.searchParams.get("_sort") || "";
-  const sortOrder = url.searchParams.get("_order") || "desc";
+  const sortOrder = url.searchParams.get("_order") === "asc" ? "asc" : "desc";
 
   const offset = (page - 1) * pageSize;
 
   // Build where conditions
   const conditions: any[] = [eq(tenantIdCol, tenantId)];
 
-  if (options?.additionalFilters) {
+  if (options?.additionalFilters?.length) {
     conditions.push(...options.additionalFilters);
   }
 
-  if (search && options?.searchCol) {
-    conditions.push(like(options.searchCol, `%${search}%`));
+  if (search && options?.searchCols?.length) {
+    const searchConditions = options.searchCols.map((col) => like(col, `%${search}%`));
+    conditions.push(searchConditions.length === 1 ? searchConditions[0] : or(...searchConditions));
   }
 
   const whereClause = and(...conditions);
@@ -70,17 +82,22 @@ export async function paginatedList<T extends SQLiteTable>(
     .from(table)
     .where(whereClause);
 
-  const total = countResult[0]?.count || 0;
+  const total = Number(countResult[0]?.count || 0);
+
+  // Resolve ordering column (only from an allow-list to avoid injection)
+  const orderCol =
+    (sortField && options?.sortableCols?.[sortField]) ||
+    options?.defaultSortCol ||
+    (table as any).created_at;
+  const dir = sortField ? sortOrder : options?.defaultSortDir || "desc";
+  const orderBy = orderCol ? (dir === "asc" ? asc(orderCol) : desc(orderCol)) : undefined;
 
   // Get data
-  let query = db
-    .select()
-    .from(table)
-    .where(whereClause)
-    .limit(pageSize)
-    .offset(offset);
+  let query: any = db.select().from(table).where(whereClause).limit(pageSize).offset(offset);
+  if (orderBy) {
+    query = query.orderBy(orderBy);
+  }
 
-  // Note: Dynamic ordering is complex with Drizzle; we'll use default desc by created_at
   const data = await query;
 
   return c.json({

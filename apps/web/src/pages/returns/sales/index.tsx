@@ -5,6 +5,7 @@ import { useShow } from "@refinedev/core";
 import { List, Create, Show, ShowButton } from "@refinedev/antd";
 import { Table, Form, Input, Select, InputNumber, Space, Tag, Descriptions, Button } from "antd";
 import { Plus, Trash2 } from "lucide-react";
+import { ProductSelect } from "../../../components/pickers";
 
 export const ReturnSalesList: React.FC = () => {
   const { tableProps } = useTable({ resource: "returns", meta: { query: { source: "sales" } }, syncWithLocation: true });
@@ -38,7 +39,7 @@ export const ReturnSalesCreate: React.FC = () => {
           {(fields, { add, remove }) => (<>
             {fields.map((field) => (
               <Space key={field.key} style={{ display: "flex", marginBottom: 8 }} align="baseline">
-                <Form.Item {...field} name={[field.name, "product_id"]} label="Produk" rules={[{ required: true }]}><Input placeholder="ID Produk" style={{ width: 160 }} /></Form.Item>
+                <ProductSelect fieldName={field.name} />
                 <Form.Item {...field} name={[field.name, "quantity"]} label="Qty" rules={[{ required: true }]}><InputNumber min={1} style={{ width: 80 }} /></Form.Item>
                 <Form.Item {...field} name={[field.name, "reason"]} label="Alasan" rules={[{ required: true }]}>
                   <Select style={{ width: 200 }} options={[

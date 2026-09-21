@@ -7,7 +7,9 @@
     {
       "binding": "DB",
       "database_name": "konsinyasi-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      // Local dev works with this placeholder. For production, create the
+      // database with `wrangler d1 create konsinyasi-db` and paste its real id.
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "drizzle"
     }
   ],
@@ -17,8 +19,9 @@
       "bucket_name": "konsinyasi-media"
     }
   ],
+  // Non-secret variables only. Secrets such as BETTER_AUTH_SECRET live in
+  // `.dev.vars` for local dev and in `wrangler secret put` for production.
   "vars": {
-    "BETTER_AUTH_SECRET": "REPLACE_WITH_SECRET_KEY",
     "BETTER_AUTH_URL": "http://localhost:8787",
     "FRONTEND_URL": "http://localhost:5173"
   }

@@ -141,6 +141,21 @@ export interface StockBatch extends TenantEntity {
   status: BatchStatus;
 }
 
+// ---- Sales Stock (stok yang dibawa Sales) ----
+export interface SalesStock extends TenantEntity {
+  sales_id: string;
+  product_id: string;
+  batch_id: string;
+  quantity: number;
+}
+
+export interface SalesStockWithDetails extends SalesStock {
+  sales_name?: string;
+  product_name?: string;
+  production_date?: string;
+  expiry_date?: string;
+}
+
 // ---- Distribution (Header) ----
 export interface Distribution extends TenantEntity {
   channel: DistributionChannel;

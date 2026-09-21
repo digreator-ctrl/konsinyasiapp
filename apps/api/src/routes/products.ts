@@ -3,7 +3,7 @@
 // ============================================================
 
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -15,8 +15,35 @@ products.use("*", authMiddleware);
 
 products.get("/", requirePermission("products", "list"), async (c) => {
   return paginatedList(c, schema.products, schema.products.tenant_id, {
-    searchCol: schema.products.name,
+    searchCols: [schema.products.name, schema.products.variation],
+    sortableCols: { name: schema.products.name, created_at: schema.products.created_at },
   });
+});
+
+// GET /:id/batches — Available stock batches for a product
+products.get("/:id/batches", requirePermission("products", "show"), async (c) => {
+  const db = getDb(c);
+  const tenantId = c.get("tenantId");
+  const id = c.req.param("id");
+
+  const batches = await db
+    .select({
+      id: schema.stockBatches.id,
+      production_date: schema.stockBatches.production_date,
+      expiry_date: schema.stockBatches.expiry_date,
+      current_quantity: schema.stockBatches.current_quantity,
+      status: schema.stockBatches.status,
+    })
+    .from(schema.stockBatches)
+    .where(
+      and(
+        eq(schema.stockBatches.tenant_id, tenantId),
+        eq(schema.stockBatches.product_id, id),
+        sql`${schema.stockBatches.current_quantity} > 0`
+      )
+    );
+
+  return c.json({ success: true, data: batches, total: batches.length });
 });
 
 products.get("/:id", requirePermission("products", "show"), async (c) => {

@@ -23,7 +23,7 @@ export const ProducerList: React.FC = () => {
           title="Jenis"
           render={(type) => (
             <Tag color={type === "internal" ? "blue" : "orange"}>
-              {type === "internal" ? "Internal" : "Pihak Ketiga"}
+              {type === "internal" ? "Internal" : "Eksternal"}
             </Tag>
           )}
         />
@@ -56,7 +56,7 @@ export const ProducerCreate: React.FC = () => {
         <Form.Item label="Jenis Produsen" name="type" rules={[{ required: true }]} initialValue="internal">
           <Select options={[
             { label: "Internal (Produksi Sendiri)", value: "internal" },
-            { label: "Pihak Ketiga (Supplier)", value: "third_party" },
+            { label: "Eksternal (Supplier)", value: "third_party" },
           ]} />
         </Form.Item>
         <Form.Item label="Alamat" name="address">

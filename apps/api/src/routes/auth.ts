@@ -5,27 +5,14 @@
 
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../index";
 import { RESOURCES, ACTIONS, DefaultRole } from "@konsinyasi/shared";
+import { hashPassword, verifyPassword } from "../lib/password";
 
 const auth = new Hono<AppEnv>();
-
-// ---- Helper: Hash password (simple for Edge — use bcrypt alternative in production) ----
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
-}
 
 // ---- Default Permissions for system roles ----
 function getDefaultPermissions(roleName: string): Array<{ resource: string; action: string }> {
@@ -216,9 +203,18 @@ auth.post("/login", async (c) => {
   }
 
   // Verify password
-  const isValid = await verifyPassword(password, user.hashed_password);
-  if (!isValid) {
+  const verifyResult = await verifyPassword(password, user.hashed_password);
+  if (!verifyResult.valid) {
     return c.json({ success: false, error: "Email atau password salah" }, 401);
+  }
+
+  // Transparently upgrade legacy unsalted hashes to salted PBKDF2
+  if (verifyResult.needsRehash) {
+    const upgraded = await hashPassword(password);
+    await db
+      .update(schema.users)
+      .set({ hashed_password: upgraded, updated_at: new Date().toISOString() })
+      .where(eq(schema.users.id, user.id));
   }
 
   // Get user roles
@@ -383,9 +379,24 @@ auth.get("/me", async (c) => {
         action: schema.rolePermissions.action,
       })
       .from(schema.rolePermissions)
-      .where(eq(schema.rolePermissions.allowed, true));
+      .where(
+        and(
+          inArray(
+            schema.rolePermissions.role_id,
+            roleIds.map((r) => r.roleId)
+          ),
+          eq(schema.rolePermissions.allowed, true)
+        )
+      );
 
-    permissions = permResult;
+    // Deduplicate permissions granted by multiple roles
+    const seen = new Set<string>();
+    permissions = permResult.filter((p) => {
+      const key = `${p.resource}:${p.action}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   return c.json({
